@@ -6,7 +6,8 @@
 import React, { useState, useCallback, useMemo } from 'react';
 import { GoogleGenAI, Modality } from "@google/genai";
 import { motion, AnimatePresence } from "motion/react";
-import { Play, Square, Loader2, Volume2, ShieldAlert, CheckCircle2, Plus, Edit2, Trash2, X, Save, QrCode, Share2 } from "lucide-react";
+import { Play, Square, Loader2, Volume2, ShieldAlert, CheckCircle2, Plus, Edit2, Trash2, X, Save, QrCode, Share2, Download, Trophy, FileText, BarChart3 } from "lucide-react";
+import * as XLSX from 'xlsx';
 
 interface QuizItem {
   id: number;
@@ -94,7 +95,6 @@ export default function App() {
   const [userInfo, setUserInfo] = useState<UserInfo | null>(null);
   const [isRegistering, setIsRegistering] = useState<boolean>(true);
   const [regForm, setRegForm] = useState<UserInfo>({ name: '', department: '' });
-  const [isSendingEmail, setIsSendingEmail] = useState<boolean>(false);
   const [isShareModalOpen, setIsShareModalOpen] = useState<boolean>(false);
   
   // CRUD States
@@ -139,41 +139,41 @@ export default function App() {
     }
   };
 
-  const submitQuiz = async () => {
+  const submitQuiz = () => {
     setIsSubmitted(true);
-    setIsSendingEmail(true);
-    
-    // Prepare results for email
-    const quizResults = questions.map(q => ({
-      question: q.question,
-      userAnswer: q.options[userAnswers[q.id] || 0],
-      correctAnswer: q.options[q.correctAnswerIndex || 0],
-      isCorrect: userAnswers[q.id] === q.correctAnswerIndex
-    }));
+  };
 
-    try {
-      const response = await fetch('/api/send-results', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userInfo,
-          score,
-          total: questions.length,
-          results: quizResults
-        })
-      });
-      
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to send email');
-      }
-      console.log('Results sent to supervisor');
-    } catch (error: any) {
-      console.error('Email error:', error);
-      alert(`ไม่สามารถส่งอีเมลได้: ${error.message}\n\nกรุณาตรวจสอบการตั้งค่า App Password ใน Secrets ครับ`);
-    } finally {
-      setIsSendingEmail(false);
-    }
+  const exportToExcel = () => {
+    if (!userInfo) return;
+
+    const workbook = XLSX.utils.book_new();
+    
+    // User Info Sheet
+    const infoData = [
+      ["Safety Quiz Results Summary"],
+      [],
+      ["Property", "Value"],
+      ["Name", userInfo.name],
+      ["Department", userInfo.department],
+      ["Score", `${score} / ${questions.length}`],
+      ["Percentage", `${((score / questions.length) * 100).toFixed(2)}%`],
+      ["Date", new Date().toLocaleString()]
+    ];
+    const wsInfo = XLSX.utils.aoa_to_sheet(infoData);
+    XLSX.utils.book_append_sheet(workbook, wsInfo, "Summary");
+
+    // Results Sheet
+    const resultsData = questions.map((q, idx) => ({
+      "No.": idx + 1,
+      "Question": q.question,
+      "Your Answer": q.options[userAnswers[q.id]] || "Unanswered",
+      "Correct Answer": q.options[q.correctAnswerIndex || 0],
+      "Result": userAnswers[q.id] === q.correctAnswerIndex ? "CORRECT" : "INCORRECT"
+    }));
+    const wsResults = XLSX.utils.json_to_sheet(resultsData);
+    XLSX.utils.book_append_sheet(workbook, wsResults, "Questions Detail");
+
+    XLSX.writeFile(workbook, `Safety_Quiz_Result_${userInfo.name.replace(/ /g, "_")}.xlsx`);
   };
 
   const playAudio = useCallback(async (base64Audio: string) => {
@@ -378,9 +378,6 @@ export default function App() {
                     <span className="text-[10px] font-bold text-emerald-700 uppercase">Final Score</span>
                     <span className="text-lg font-black text-emerald-600">{score}/{questions.length}</span>
                   </div>
-                  <div className="text-[9px] text-center font-bold text-emerald-600 bg-emerald-50 py-1 rounded">
-                    {isSendingEmail ? "กำลังส่งผลการทดสอบ..." : "ส่งรายงานเรียบร้อยแล้ว ✅"}
-                  </div>
                   <div className="text-[10px] font-medium text-[var(--text-muted)] text-center italic">
                     {score === questions.length ? "ยินดีด้วย! คุณตอบถูกทุกข้อ" : "เกือบสมบูรณ์แบบ! ลองทบทวนข้อที่ผิดดูนะ"}
                   </div>
@@ -398,7 +395,7 @@ export default function App() {
                     onClick={submitQuiz}
                     className="w-full py-3 bg-emerald-600 text-white text-xs font-black rounded-lg uppercase tracking-widest hover:bg-emerald-700 transition-all shadow-md active:scale-95 flex items-center justify-center gap-2"
                   >
-                    <CheckCircle2 size={16} /> Submit & Send Results
+                    <CheckCircle2 size={16} /> Submit Quiz
                   </button>
                 </div>
               ) : (
@@ -422,31 +419,146 @@ export default function App() {
           </div>
 
           <div className="mt-auto pt-6 border-t border-[var(--light-grey)]">
-            <button className="w-full py-3 bg-[var(--dark-grey)] text-white text-xs font-bold rounded uppercase tracking-widest hover:bg-[var(--slate-grey)] transition-colors shadow-lg active:translate-y-px">
-              Export Audio File
+            <button 
+              onClick={exportToExcel}
+              disabled={!isSubmitted}
+              className={`w-full py-3 text-white text-xs font-bold rounded uppercase tracking-widest transition-colors shadow-lg active:translate-y-px flex items-center justify-center gap-2 ${isSubmitted ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-slate-300 cursor-not-allowed'}`}
+            >
+              <Download size={14} /> Export Results (Excel)
             </button>
           </div>
         </aside>
 
         {/* Script Area */}
         <section className="flex flex-col p-6 sm:p-8 gap-4 overflow-hidden bg-[var(--light-grey)]">
-          <div className="flex justify-between items-center">
-            <h2 className="text-base font-bold text-[var(--dark-grey)] tracking-tight">Audio Script Preview</h2>
-            <div className="flex items-center gap-3">
-              <button 
-                onClick={() => openEditor()}
-                className="flex items-center gap-2 px-3 py-1.5 bg-emerald-600 text-white text-[10px] font-bold rounded uppercase tracking-tighter hover:bg-emerald-700 transition-colors shadow-sm"
-              >
-                <Plus size={14} /> เพิ่มคำถาม
-              </button>
-              <div className="text-[10px] font-bold text-[var(--text-muted)] bg-[var(--border-color)] px-2 py-1 rounded">
-                {questions.length} Questions | {questions.reduce((acc, q) => acc + q.question.length, 0)} Chars
+          {isSubmitted ? (
+            <motion.div 
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="flex-1 space-y-6 overflow-y-auto custom-scrollbar"
+            >
+              <div className="bg-white rounded-3xl shadow-xl overflow-hidden border border-[var(--border-color)]">
+                <div className="bg-[var(--dark-grey)] p-8 text-white relative">
+                  <div className="relative z-10">
+                    <div className="flex items-center gap-4 mb-4">
+                      <div className="w-16 h-16 bg-[var(--safety-yellow)] rounded-2xl flex items-center justify-center text-3xl">
+                        <Trophy className="text-[var(--dark-grey)]" />
+                      </div>
+                      <div>
+                        <h2 className="text-2xl font-black tracking-tight">QUIZ SUMMARY</h2>
+                        <p className="text-white/60 text-xs font-medium uppercase tracking-widest">Performance Report</p>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="absolute -right-8 -bottom-8 w-48 h-48 bg-white/5 rounded-full"></div>
+                </div>
+
+                <div className="p-8">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
+                    <div className="space-y-6">
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-black uppercase text-slate-400 tracking-wider flex items-center gap-1">
+                          <FileText size={10} /> Candidate Information
+                        </label>
+                        <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 italic font-medium">
+                          <p className="text-lg text-[var(--dark-grey)]">{userInfo?.name}</p>
+                          <p className="text-sm text-slate-500">{userInfo?.department}</p>
+                        </div>
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-black uppercase text-slate-400 tracking-wider flex items-center gap-1">
+                          <BarChart3 size={10} /> Statistics
+                        </label>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 text-center">
+                            <p className="text-[10px] uppercase font-bold text-slate-400 mb-1">Score</p>
+                            <p className="text-2xl font-black text-emerald-600">{score}/{questions.length}</p>
+                          </div>
+                          <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 text-center">
+                            <p className="text-[10px] uppercase font-bold text-slate-400 mb-1">Percentage</p>
+                            <p className="text-2xl font-black text-sky-600">{((score / questions.length) * 100).toFixed(0)}%</p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col items-center justify-center p-6 bg-slate-50 rounded-3xl border border-dashed border-slate-300">
+                      <div className="text-center mb-6">
+                        <div className="mb-2 flex justify-center">
+                          <div className={`p-4 rounded-full ${score === questions.length ? 'bg-emerald-100 text-emerald-600' : 'bg-sky-100 text-sky-600'}`}>
+                            {score === questions.length ? <CheckCircle2 size={32} /> : <ShieldAlert size={32} />}
+                          </div>
+                        </div>
+                        <h3 className="font-black text-slate-800 text-lg uppercase tracking-tight">
+                          {score === questions.length ? "EXCELLENT WORK!" : "COMPLETED"}
+                        </h3>
+                        <p className="text-xs text-slate-500 font-medium">
+                          {score === questions.length 
+                            ? "คุณตอบถูกทุกข้อ! ยอดเยี่ยมมาก" 
+                            : "คุณได้เรียนรู้ขั้นตอนความปลอดภัยที่สำคัญแล้ว"}
+                        </p>
+                      </div>
+                      
+                      <button 
+                        onClick={exportToExcel}
+                        className="w-full py-4 bg-[var(--safety-yellow)] text-[var(--dark-grey)] text-xs font-black rounded-2xl uppercase tracking-[0.2em] shadow-lg hover:brightness-105 transition-all flex items-center justify-center gap-3"
+                      >
+                        <Download size={18} /> Download Excel Report
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="border-t border-slate-100 pt-8">
+                    <h4 className="text-[10px] font-black uppercase text-slate-400 tracking-wider mb-4">Detailed Review / รายละเอียดรายข้อ</h4>
+                    <div className="space-y-4">
+                      {questions.map((q, idx) => {
+                        const isCorrect = userAnswers[q.id] === q.correctAnswerIndex;
+                        return (
+                          <div key={q.id} className={`p-4 rounded-2xl border flex gap-4 items-start ${isCorrect ? 'bg-emerald-50/50 border-emerald-100' : 'bg-rose-50/50 border-rose-100'}`}>
+                            <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-black shrink-0 ${isCorrect ? 'bg-emerald-200 text-emerald-700' : 'bg-rose-200 text-rose-700'}`}>
+                              {idx + 1}
+                            </div>
+                            <div className="space-y-1 min-w-0">
+                              <p className="text-xs font-bold text-slate-800 truncate sm:whitespace-normal">{q.question}</p>
+                              <div className="flex flex-wrap gap-x-4 gap-y-1">
+                                <p className="text-[10px] font-medium text-slate-500">
+                                  Your Answer: <span className={isCorrect ? 'text-emerald-600' : 'text-rose-600'}>{q.options[userAnswers[q.id]] || "N/A"}</span>
+                                </p>
+                                {!isCorrect && (
+                                  <p className="text-[10px] font-medium text-emerald-600">
+                                    Correct: {q.options[q.correctAnswerIndex || 0]}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
               </div>
-            </div>
-          </div>
-          
-          <div className="flex-1 bg-white rounded-lg shadow-sm border border-[var(--border-color)] overflow-y-auto custom-scrollbar">
-            <div className="p-6 md:p-8 space-y-8">
+            </motion.div>
+          ) : (
+            <>
+              <div className="flex justify-between items-center">
+                <h2 className="text-base font-bold text-[var(--dark-grey)] tracking-tight">Audio Script Preview</h2>
+                <div className="flex items-center gap-3">
+                  <button 
+                    onClick={() => openEditor()}
+                    className="flex items-center gap-2 px-3 py-1.5 bg-emerald-600 text-white text-[10px] font-bold rounded uppercase tracking-tighter hover:bg-emerald-700 transition-colors shadow-sm"
+                  >
+                    <Plus size={14} /> เพิ่มคำถาม
+                  </button>
+                  <div className="text-[10px] font-bold text-[var(--text-muted)] bg-[var(--border-color)] px-2 py-1 rounded">
+                    {questions.length} Questions | {questions.reduce((acc, q) => acc + q.question.length, 0)} Chars
+                  </div>
+                </div>
+              </div>
+              
+              <div className="flex-1 bg-white rounded-lg shadow-sm border border-[var(--border-color)] overflow-y-auto custom-scrollbar">
+                <div className="p-6 md:p-8 space-y-8">
               {questions.map((item) => (
                 <div key={item.id} className="quiz-item-border group">
                   <div className="flex justify-between items-start gap-4 mb-3">
@@ -515,7 +627,7 @@ export default function App() {
                             flex-shrink-0 w-6 h-6 rounded-lg flex items-center justify-center text-[10px] font-black
                             ${isSelected ? 'bg-white/20' : 'bg-black/5'}
                           `}>
-                            {String.fromCharCode(65 + idx)}
+                            {['ก', 'ข', 'ค', 'ง'][idx] || String.fromCharCode(65 + idx)}
                           </span>
                           <span className="flex-1">{option.split('.').slice(1).join('.').trim() || option}</span>
                           
@@ -538,7 +650,9 @@ export default function App() {
               ))}
             </div>
           </div>
-        </section>
+        </>
+      )}
+    </section>
       </main>
 
       {/* Footer / Controls */}
