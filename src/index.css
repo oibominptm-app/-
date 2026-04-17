@@ -1,0 +1,46 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Segoe UI", Tahoma, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+}
+
+:root {
+  --safety-yellow: #FFD700;
+  --safety-orange: #FF8C00;
+  --dark-grey: #1A1C1E;
+  --slate-grey: #2C2F33;
+  --light-grey: #F0F2F5;
+  --text-main: #1A1C1E;
+  --text-muted: #64748B;
+  --border-color: #E2E8F0;
+}
+
+@layer base {
+  body {
+    @apply bg-[var(--light-grey)] text-[var(--text-main)] font-sans;
+  }
+}
+
+@layer components {
+  .safety-icon {
+    @apply w-8 h-8 bg-[var(--safety-yellow)] flex items-center justify-center font-bold text-black pb-0.5;
+    clip-path: polygon(50% 0%, 0% 100%, 100% 100%);
+  }
+
+  .voice-badge {
+    @apply flex items-center gap-2 p-3 bg-[var(--light-grey)] rounded-md border-l-4 border-[var(--safety-orange)];
+  }
+
+  .playback-btn {
+    @apply w-12 h-12 rounded-full bg-[var(--dark-grey)] text-white flex items-center justify-center cursor-pointer border-none shadow-lg transition-colors hover:bg-[var(--slate-grey)];
+  }
+
+  .playback-btn-primary {
+    @apply w-12 h-12 rounded-full bg-[var(--safety-orange)] text-white flex items-center justify-center cursor-pointer border-none shadow-lg transition-colors hover:brightness-110;
+  }
+
+  .quiz-item-border {
+    @apply border-b border-dashed border-[var(--border-color)] pb-4 mb-4 last:border-none last:pb-0 last:mb-0;
+  }
+}

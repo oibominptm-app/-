@@ -1,0 +1,6 @@
+{
+  "name": "Safety Quiz PTM",
+  "description": "A Text-to-Speech application for safety quiz questions using Gemini 3.1 TTS.",
+  "requestFramePermissions": [],
+  "majorCapabilities": []
+}
